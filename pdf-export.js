@@ -65,7 +65,66 @@
       : "cambodia-import-tax-estimate.pdf";
   }
 
-  function exportCalculationPdf(calculation, currency, exchangeRate) {
+  function isMobileDevice() {
+    const userAgent = navigator.userAgent || navigator.vendor || "";
+    const mobilePattern = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+    return mobilePattern.test(userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
+  }
+
+  function triggerDownload(blob, fileName) {
+    const downloadUrl = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+
+    downloadLink.href = downloadUrl;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    window.setTimeout(function () {
+      URL.revokeObjectURL(downloadUrl);
+    }, 60000);
+  }
+
+  async function handlePdfOutput(pdf, fileName, action) {
+    const pdfBlob = pdf.output("blob");
+
+    if (action === "download") {
+      if (isMobileDevice() && navigator.share && typeof File !== "undefined") {
+        const shareFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+        if (!navigator.canShare || navigator.canShare({ files: [shareFile] })) {
+          await navigator.share({
+            files: [shareFile],
+            title: "Cambodia Import Tax Estimate"
+          });
+          return;
+        }
+      }
+
+      triggerDownload(pdfBlob, fileName);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(pdfBlob);
+
+    if (isMobileDevice()) {
+      window.location.href = previewUrl;
+    } else {
+      const previewWindow = window.open(previewUrl, "_blank");
+
+      if (!previewWindow) {
+        URL.revokeObjectURL(previewUrl);
+        throw new Error("Preview window blocked");
+      }
+    }
+
+    window.setTimeout(function () {
+      URL.revokeObjectURL(previewUrl);
+    }, 60000);
+  }
+
+  function generateTaxPdf(calculation, currency, exchangeRate) {
     const jsPdfLibrary = window.jspdf;
 
     if (!jsPdfLibrary || !jsPdfLibrary.jsPDF) {
@@ -363,26 +422,24 @@
     drawPdfNotes();
     drawPdfFooter(doc.getNumberOfPages());
 
-    const previewWindow = window.open("", "_blank");
+    return doc;
+  }
 
-    if (!previewWindow) {
-      throw new Error("Preview window blocked");
-    }
+  async function exportCalculationPdf(calculation, currency, exchangeRate, action) {
+    const pdf = generateTaxPdf(calculation, currency, exchangeRate);
+    const fileName = buildPdfFileName(calculation);
 
-    const pdfBlob = doc.output("blob");
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    previewWindow.location.href = pdfUrl;
+    await handlePdfOutput(pdf, fileName, action || "preview");
 
-    window.setTimeout(function () {
-      URL.revokeObjectURL(pdfUrl);
-    }, 60000);
-
-    return buildPdfFileName(calculation);
+    return fileName;
   }
 
   window.PdfExport = {
     buildPdfData: buildPdfData,
     buildPdfFileName: buildPdfFileName,
+    generateTaxPdf: generateTaxPdf,
+    handlePdfOutput: handlePdfOutput,
+    isMobileDevice: isMobileDevice,
     exportCalculationPdf: exportCalculationPdf
   };
 })();

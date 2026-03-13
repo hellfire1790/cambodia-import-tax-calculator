@@ -560,7 +560,7 @@ async function handleCopyClick() {
   }
 }
 
-function handleExportPdfClick() {
+async function handleExportPdfClick() {
   if (!lastCalculation) {
     setMessage("Please calculate the tax before previewing the PDF.", false);
     return;
@@ -577,7 +577,7 @@ function handleExportPdfClick() {
   const exchangeRate = currency === "KHR" ? parseFormattedNumber(exchangeRateRaw) : 1;
 
   try {
-    window.PdfExport.exportCalculationPdf(lastCalculation, currency, exchangeRate);
+    await window.PdfExport.exportCalculationPdf(lastCalculation, currency, exchangeRate, "preview");
     clearMessage();
   } catch (error) {
     setMessage("PDF preview failed. Please try again in a browser tab that allows pop-ups.", false);
