@@ -74,7 +74,10 @@ function formatMoney(value, currency) {
 }
 
 function formatPercent(value) {
-  return formatNumber(value) + "%";
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4
+  }) + "%";
 }
 
 function formatMultiplier(value) {
