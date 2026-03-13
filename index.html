@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cambodia Import Tax Calculator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <main class="card">
+      <h1>Cambodia Import Tax Calculator</h1>
+      <p class="intro">Enter import details below to calculate Cambodian import taxes.</p>
+
+      <div class="form-grid">
+        <div class="field full-width">
+          <label for="productName">Product Name (Optional)</label>
+          <input id="productName" type="text" placeholder="Example: Laptop">
+        </div>
+
+        <div class="field">
+          <label for="hsCode">HS Code (Optional - for reference only)</label>
+          <input id="hsCode" type="text" placeholder="Example: 8471.30">
+          <div class="helper-text">Optional reference only</div>
+        </div>
+
+        <div class="field">
+          <label for="cifValue">CIF Value (Before Tax)</label>
+          <input id="cifValue" type="text" inputmode="decimal" placeholder="0.00">
+          <div class="helper-text">Enter total CIF amount before tax</div>
+        </div>
+
+        <div class="field">
+          <label for="cdRate">Customs Duty (CD) Rate (%)</label>
+          <input id="cdRate" type="text" inputmode="decimal" placeholder="0.00">
+          <div class="helper-text">Enter percentage only, e.g. 5 for 5%. Applied directly on CIF value.</div>
+        </div>
+
+        <div class="field">
+          <label for="stRate">Special Tax (ST) Rate (%)</label>
+          <input id="stRate" type="text" inputmode="decimal" placeholder="0.00">
+          <div class="helper-text">Enter percentage only, e.g. 5 for 5%. Applied on CIF + Customs Duty.</div>
+        </div>
+
+        <div class="field">
+          <label for="vatRate">Value Added Tax (VAT) Rate (%)</label>
+          <input id="vatRate" type="text" inputmode="decimal" placeholder="0.00">
+          <div class="helper-text">Enter percentage only, e.g. 5 for 5%. Applied on CIF + CD + ST.</div>
+        </div>
+
+        <div class="field">
+          <label>Currency</label>
+          <div class="toggle-group">
+            <label class="toggle-option" for="currencyUsd">
+              <input id="currencyUsd" type="radio" name="currency" value="USD" checked>
+              <span>USD</span>
+            </label>
+            <label class="toggle-option" for="currencyKhr">
+              <input id="currencyKhr" type="radio" name="currency" value="KHR">
+              <span>KHR</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="exchangeRateField" class="field is-disabled">
+          <label for="exchangeRate">Exchange Rate (KHR per USD)</label>
+          <input id="exchangeRate" type="text" inputmode="decimal" placeholder="4,000" disabled>
+          <div class="helper-text">Default rate: 4,000 KHR per USD. You can override this.</div>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="calculateButton" type="button">Calculate Tax</button>
+        <button id="resetButton" type="button" class="secondary-button">Reset</button>
+        <button id="copyButton" type="button" class="secondary-button hidden" disabled>Copy Estimate</button>
+        <button id="exportPdfButton" type="button" class="secondary-button hidden" disabled>Preview PDF</button>
+      </div>
+
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <section id="summarySection" class="insight-card hidden" aria-live="polite">
+        <h2>Import Cost Summary</h2>
+        <div class="insight-grid">
+          <div class="insight-item primary summary-final">
+            <span class="insight-label">Final Landed Cost</span>
+            <span id="summaryLandedCost" class="insight-value">$0.00</span>
+          </div>
+          <div class="insight-item tax-highlight summary-total">
+            <span class="insight-label">Total Import Tax</span>
+            <span id="summaryTotalTax" class="insight-value">$0.00</span>
+            <span id="summaryTaxRateHint" class="insight-subtitle">0.00% of CIF</span>
+          </div>
+          <div class="insight-item secondary summary-rate">
+            <span class="insight-label">Effective Tax Rate</span>
+            <span id="summaryTaxRate" class="insight-value">0.00%</span>
+          </div>
+          <div class="insight-item secondary summary-cif">
+            <span class="insight-label">CIF Value</span>
+            <span id="summaryCif" class="insight-value">$0.00</span>
+          </div>
+          <div class="insight-item secondary summary-multiplier">
+            <span class="insight-label">Import Multiplier</span>
+            <span id="summaryMultiplier" class="insight-value">1.000×</span>
+          </div>
+        </div>
+        <div class="summary-meta">
+          <p id="summaryCurrencyNote" class="exchange-note">Results are shown in USD.</p>
+          <p class="disclaimer">Estimate only. Final duties and taxes may vary depending on customs assessment, HS classification, and applicable regulations.</p>
+        </div>
+      </section>
+
+      <section id="distributionSection" class="distribution hidden" aria-live="polite">
+        <h2>Import Tax Breakdown</h2>
+        <div class="distribution-bar">
+          <div id="distributionCdBar" class="distribution-segment segment-cd" style="width: 0%;"></div>
+          <div id="distributionStBar" class="distribution-segment segment-st" style="width: 0%;"></div>
+          <div id="distributionVatBar" class="distribution-segment segment-vat" style="width: 0%;"></div>
+        </div>
+        <div class="distribution-list">
+          <div class="distribution-item">
+            <div class="distribution-name">
+              <span class="distribution-dot segment-cd"></span>
+              <span>Customs Duty</span>
+            </div>
+            <div class="distribution-values">
+              <span id="distributionCdAmount" class="distribution-amount">$0.00</span>
+            </div>
+          </div>
+          <div class="distribution-item">
+            <div class="distribution-name">
+              <span class="distribution-dot segment-st"></span>
+              <span>Special Tax</span>
+            </div>
+            <div class="distribution-values">
+              <span id="distributionStAmount" class="distribution-amount">$0.00</span>
+            </div>
+          </div>
+          <div class="distribution-item">
+            <div class="distribution-name">
+              <span class="distribution-dot segment-vat"></span>
+              <span>VAT</span>
+            </div>
+            <div class="distribution-values">
+              <span id="distributionVatAmount" class="distribution-amount">$0.00</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <button id="breakdownToggle" type="button" class="breakdown-toggle hidden" aria-expanded="false">
+        <div class="breakdown-toggle-header">
+          <span class="breakdown-toggle-title">Calculation Breakdown</span>
+          <span id="breakdownToggleLabel" class="breakdown-toggle-action">Show details ▾</span>
+        </div>
+        <div class="breakdown-toggle-help">View step-by-step tax formulas and calculations.</div>
+      </button>
+
+      <section id="breakdownSection" class="breakdown hidden" aria-live="polite">
+        <h2>Calculation Breakdown</h2>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Starting Value</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">CIF Value</span>
+            <span id="breakdownCif" class="breakdown-row-value">$0.00</span>
+          </div>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Step 1 - Customs Duty</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Base</span>
+            <span id="breakdownCdBase" class="breakdown-row-value">CIF</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Calculation</span>
+            <span id="breakdownCd" class="breakdown-row-value">CD = $0.00 x 0.00%</span>
+          </div>
+          <div class="breakdown-row breakdown-result">
+            <span class="breakdown-row-title">Result</span>
+            <span id="breakdownCdResult" class="breakdown-row-value">= $0.00</span>
+          </div>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Step 2 - Special Tax</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Tax Base</span>
+            <span id="breakdownStBase" class="breakdown-row-value">ST base = CIF + CD</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Calculation</span>
+            <span id="breakdownSt" class="breakdown-row-value">ST = $0.00 x 0.00%</span>
+          </div>
+          <div class="breakdown-row breakdown-result">
+            <span class="breakdown-row-title">Result</span>
+            <span id="breakdownStResult" class="breakdown-row-value">= $0.00</span>
+          </div>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Step 3 - VAT</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Tax Base</span>
+            <span id="breakdownVatBase" class="breakdown-row-value">VAT base = CIF + CD + ST</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Calculation</span>
+            <span id="breakdownVat" class="breakdown-row-value">VAT = $0.00 x 0.00%</span>
+          </div>
+          <div class="breakdown-row breakdown-result">
+            <span class="breakdown-row-title">Result</span>
+            <span id="breakdownVatResult" class="breakdown-row-value">= $0.00</span>
+          </div>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Step 4 - Total Tax</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Calculation</span>
+            <span id="breakdownTotalTax" class="breakdown-row-value">$0.00 + $0.00 + $0.00</span>
+          </div>
+          <div class="breakdown-row breakdown-result">
+            <span class="breakdown-row-title">Result</span>
+            <span id="breakdownTotalTaxResult" class="breakdown-row-value">= $0.00</span>
+          </div>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Step 5 - Final Landed Cost</span>
+          <div class="breakdown-row">
+            <span class="breakdown-row-title">Calculation</span>
+            <span id="breakdownLandedCost" class="breakdown-row-value">$0.00 + $0.00</span>
+          </div>
+          <div class="breakdown-row breakdown-result">
+            <span class="breakdown-row-title">Result</span>
+            <span id="breakdownLandedCostResult" class="breakdown-row-value">= $0.00</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="printReport" class="print-report">
+        <div class="print-report-header">
+          <h1>Cambodia Import Tax Estimate</h1>
+          <p>Generated from Cambodia Import Tax Calculator</p>
+          <p id="printGeneratedDate">Date generated: -</p>
+        </div>
+
+        <section class="print-report-section">
+          <h2>Input Details</h2>
+          <div class="print-detail-grid">
+            <div class="print-detail-row"><span>Product Name</span><span id="printProductName">N/A</span></div>
+            <div class="print-detail-row"><span>HS Code</span><span id="printHsCode">N/A</span></div>
+            <div class="print-detail-row"><span>CIF Value Entered</span><span id="printInputCif">-</span></div>
+            <div class="print-detail-row"><span>Customs Duty (CD) Rate</span><span id="printCdRate">-</span></div>
+            <div class="print-detail-row"><span>Special Tax (ST) Rate</span><span id="printStRate">-</span></div>
+            <div class="print-detail-row"><span>Value Added Tax (VAT) Rate</span><span id="printVatRate">-</span></div>
+            <div class="print-detail-row"><span>Currency Selected</span><span id="printCurrency">-</span></div>
+            <div class="print-detail-row hidden" id="printExchangeRateRow"><span>Exchange Rate</span><span id="printExchangeRate">-</span></div>
+          </div>
+        </section>
+
+        <section class="print-report-section">
+          <h2>Estimate Summary</h2>
+          <div class="print-summary-grid">
+            <div class="print-summary-card primary">
+              <span>Final Landed Cost</span>
+              <strong id="printFinalLandedCost">-</strong>
+            </div>
+            <div class="print-summary-card secondary">
+              <span>Total Import Tax</span>
+              <strong id="printTotalImportTax">-</strong>
+            </div>
+            <div class="print-summary-card">
+              <span>CIF Value</span>
+              <strong id="printSummaryCif">-</strong>
+            </div>
+            <div class="print-summary-card">
+              <span>Effective Tax Rate</span>
+              <strong id="printEffectiveTaxRate">-</strong>
+            </div>
+            <div class="print-summary-card">
+              <span>Import Multiplier</span>
+              <strong id="printImportMultiplier">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="print-report-section">
+          <h2>Import Tax Breakdown</h2>
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th>Tax Type</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Customs Duty</td>
+                <td id="printBreakdownCd">-</td>
+              </tr>
+              <tr>
+                <td>Special Tax</td>
+                <td id="printBreakdownSt">-</td>
+              </tr>
+              <tr>
+                <td>VAT</td>
+                <td id="printBreakdownVat">-</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="print-report-section print-notes">
+          <h2>Notes</h2>
+          <p id="printCurrencyNote">-</p>
+          <p id="printExchangeRateNote" class="hidden">-</p>
+          <p>Estimate only. Final duties and taxes may vary depending on customs assessment, HS classification, and applicable regulations.</p>
+        </section>
+      </section>
+
+      <footer class="footer-note" aria-label="Page footer">
+        <p>Atlas Tools - Cambodia Import Utilities</p>
+        <p>Estimates only. Actual duties and taxes may vary depending on customs assessment, HS classification, and applicable Cambodian regulations.</p>
+        <p>Not affiliated with the General Department of Customs and Excise.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="print-report.js"></script>
+  <script src="pdf-export.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
